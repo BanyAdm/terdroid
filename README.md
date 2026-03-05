@@ -1,7 +1,7 @@
 # Terdroid
 Make An Android apk Project easily with termux
 
-some libraries had to be patched for this to work on termux
+some libraries had to be patched for this to work on termux like `AAPT2`
 
 # Requirements
 - Android Sdk, Gradle
@@ -15,3 +15,8 @@ some libraries had to be patched for this to work on termux
   ```bash
   pkg install gradle
   ```
+
+# Installation
+```bash
+ bash <(curl -Lf https://raw.githubusercontent.com/banyadm/terdroid/main/setup)
+```
