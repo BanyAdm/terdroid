@@ -1,3 +1,0 @@
-wget -O /data/data/com.termux/files/usr/bin/terdroid https://raw.githubusercontent.com/banyadm/terdroid/main/terdroid
-chmod +x /data/data/com.termux/files/usr/bin/terdroid
-echo "Terdroid Installed."
