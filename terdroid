@@ -1,0 +1,186 @@
+#!/bin/bash
+
+set -e
+
+if [ -z "$ANDROID_HOME" ]; then
+    echo "Error: \$ANDROID_HOME environment is not set. Needed to locate the Android SDK."
+    exit 1
+fi
+
+command="/tools/android"
+android=$ANDROID_HOME$command
+
+# Check that at least one argument is passed
+if [ -z "$1" ]; then
+    echo "Usage: $0 <command>"
+    echo "Commands:"
+    echo "  new   - create a new project"
+    echo "  build - build the project and open APK"
+    exit 1
+fi
+
+cmd="$1"
+shift # remove first argument
+
+case "$cmd" in
+    new)
+        echo "New Android Project"
+        echo -e "Directory: $(pwd)\n"
+
+        # gather info about the project
+        echo "Project name? [$(basename $(pwd))]"
+        read name
+        if [ -z "$name" ]; then
+            name="$(basename $(pwd))"
+        fi
+
+        com="com"
+        defaultpackage=$com.$name
+
+        echo "Package name? [$defaultpackage]"
+        read package
+        if [ -z "$package" ]; then
+            package=$defaultpackage
+        fi
+
+        echo "Min SDK? [21]"
+        read minsdk
+        if [ -z "$minsdk" ]; then
+            minsdk=21
+        fi
+
+        latestSdk=$(sdkmanager --list 2>&1 | \
+          grep -v "Mapping new ns" | \
+          grep -v "unexpected element" | \
+          grep "platforms;android-[0-9]\+" | \
+          awk -F';' '{print $2}' | \
+          sed 's/android-\([0-9]\+\).*/\1/' | \
+          sort -nr | head -1)
+
+        echo "Target SDK? [$latestSdk]"
+        read targetsdk
+        if [ -z "$targetsdk" ]; then
+            targetsdk=$latestSdk
+        fi
+
+        echo -e "\nBuilding project structure..\n"
+
+        mkdir -p app/src/main/java/com/example/hello
+
+        # Gradle settings
+        cat > settings.gradle <<EOF
+rootProject.name = "$name"
+include(":app")
+EOF
+
+        cat > build.gradle <<EOF
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.2.2"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+EOF
+
+        cat > gradle.properties <<EOF
+org.gradle.jvmargs=-Xmx1024m
+android.useAndroidX=false
+EOF
+
+        # App build.gradle
+        cat > app/build.gradle <<EOF
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "$package"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "$package"
+        minSdk = $minsdk
+        targetSdk = $targetsdk
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+        }
+    }
+}
+
+dependencies {}
+EOF
+
+        # AndroidManifest
+        mkdir -p app/src/main
+        cat > app/src/main/AndroidManifest.xml <<EOF
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="$name"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>
+EOF
+
+        # MainActivity.java
+        cat > app/src/main/java/com/example/hello/MainActivity.java <<EOF
+package $package;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.widget.TextView;
+
+public class MainActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        TextView tv = new TextView(this);
+        tv.setText("Hello World!");
+        tv.setTextSize(22);
+
+        setContentView(tv);
+    }
+}
+EOF
+        echo "Project created successfully."
+        ;;
+
+    build)
+        echo "Building project..."
+        gradle assembleDebug
+        echo " 
+Opening APK...
+             "
+        termux-open app/build/outputs/apk/debug/app-debug.apk
+        ;;
+
+    *)
+        echo "Unknown command: $cmd"
+        echo "Available commands: new, build"
+        exit 1
+        ;;
+esac
